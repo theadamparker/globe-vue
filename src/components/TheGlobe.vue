@@ -1,7 +1,11 @@
 <script>
-import { onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
-import * as THREE from 'three'
-import globeTexture from '@/assets/img/globe-texture.jpg'
+import { onMounted, onBeforeUnmount, ref, nextTick } from 'vue';
+import * as THREE from 'three';
+import globeTexture from '@/assets/img/globe-texture.jpg';
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default {
   setup() {
@@ -13,6 +17,8 @@ export default {
     let targetRotationY = 0
     let isTweening = false
     const autoRotate = ref(true)
+    // ScrollTrigger animation reference
+    let scrollAnimation = null
 
     function getContainerSize() {
       return {
@@ -107,13 +113,16 @@ export default {
               rotationY += delta * 0.1 // Adjust 0.1 for speed (0.1 = fast, 0.05 = slower)
             }
           } else if (autoRotate.value && !isDragging) {
-            rotationY += 0.005
+            rotationY += 0.0025 // Reduced from 0.005 to 0.0025 (half speed)
           }
           globe.rotation.y = rotationY
           renderer.render(scene, camera)
           animationId = requestAnimationFrame(animate)
         }
         animate()
+
+        // Set up ScrollTrigger animation after the globe is loaded
+        setupScrollAnimation()
       })
 
       container.value.addEventListener('mousedown', onPointerDown)
@@ -125,6 +134,29 @@ export default {
       window.addEventListener('resize', onWindowResize)
     })
 
+    function setupScrollAnimation() {
+      // Create a GSAP timeline with ScrollTrigger
+      scrollAnimation = gsap.timeline({
+        scrollTrigger: {
+          trigger: '.section__hero',
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 1, // Smooth scrubbing effect
+          // pin: container.value, // Pin the globe container 
+          // pinSpacing: false,
+          // anticipatePin: 1,
+          markers: false, // Set to true for development/debugging
+        }
+      })
+
+      // Animate the globe to move to the right
+      scrollAnimation.to(container.value, {
+        right: "20%", 
+        ease: 'none', // Linear animation to follow scroll exactly
+        duration: 1
+      })
+    }
+
     function onWindowResize() {
       if (!container.value) return
       const { width, height } = getContainerSize()
@@ -134,6 +166,13 @@ export default {
     }
 
     onBeforeUnmount(() => {
+      // Kill the ScrollTrigger animation
+      if (scrollAnimation) {
+        const st = scrollAnimation.scrollTrigger
+        if (st) st.kill()
+        scrollAnimation.kill()
+      }
+
       cancelAnimationFrame(animationId)
       window.removeEventListener('resize', onWindowResize)
       if (renderer) renderer.dispose()
@@ -161,23 +200,29 @@ export default {
 }
 </script>
 <template>
-  <div>
-    <div style="text-align:center; margin-bottom: 1em;">
-      <button @click="centerOnKenya">Kenya</button>
-      <button @click="centerOnBolivia">Bolivia</button>
-      <button @click="toggleRotation">{{ autoRotate ? 'Pause rotation' : 'Start rotation' }}</button>
-    </div>
-    <div ref="container" class="globe-container"></div>
-  </div>
+  <div ref="container" class="globe-container"></div>
 </template>
-<style scoped>
+<style scoped lang="scss">
 .globe-container {
   width: 80%;
   aspect-ratio: 1/1;
-  /* max-width: 600px; */
-  min-height: 600px;
-  margin: 0 auto;
+  max-width: 800px;
+  min-height: 800px;
   background: transparent;
+  position: fixed;
+  top: 50%;
+  right: 50%;
+  transform: translate(50%, -50%);
+  z-index: 10;
+  will-change: transform;
+  pointer-events: none;
+  /* Allow scrolling through the globe */
+}
+
+/* Make buttons clickable by overriding pointer-events for the controls */
+div>div:first-child {
   position: relative;
+  z-index: 20;
+  pointer-events: auto;
 }
 </style>

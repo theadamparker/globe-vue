@@ -1,18 +1,12 @@
 <script setup>
-import Globe from './components/Globe.vue'
+import SectionHero from './components/SectionHero.vue'
+import SectionDayana from './components/SectionDayana.vue'
 </script>
 
 <template>
   <main>
-    <Globe />
+    <SectionHero />
+    <SectionDayana />
   </main>
 </template>
 
-<style>
-:root {
-  --Dark-Green: #2d6954;
-}
-body {
-  background: var(--Dark-Green, #2d6954);
-}
-</style>
