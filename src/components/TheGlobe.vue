@@ -91,9 +91,11 @@ export default {
       container.value.appendChild(renderer.domElement)
 
       new THREE.TextureLoader().load(globeTexture, (texture) => {
-        const geometry = new THREE.SphereGeometry(0.8, 64, 64)
+        const geometry = new THREE.SphereGeometry(1, 64, 64) // Changed radius to 1 for more straightforward scaling
         const material = new THREE.MeshStandardMaterial({ map: texture })
         globe = new THREE.Mesh(geometry, material)
+        // Set initial scale to 0.8
+        globe.scale.set(0.8, 0.8, 0.8)
         scene.add(globe)
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.2)
@@ -142,19 +144,76 @@ export default {
           start: 'top top',
           end: 'bottom top',
           scrub: 1, // Smooth scrubbing effect
-          // pin: container.value, // Pin the globe container 
-          // pinSpacing: false,
-          // anticipatePin: 1,
           markers: false, // Set to true for development/debugging
+          onEnter: () => {
+            // Stop auto rotation when scroll animation starts
+            autoRotate.value = false;
+          },
+          onUpdate: (self) => {
+            // If globe exists, update its scale based on scroll progress
+            if (globe) {
+              // Scale from 0.8 to 1.2 (50% increase) based on scroll progress
+              const finalScale = 1.2;
+              const initialScale = 0.8;
+              const scaleProgress = initialScale + (self.progress * (finalScale - initialScale));
+              globe.scale.set(scaleProgress, scaleProgress, scaleProgress);
+              
+              // Smoothly rotate to Bolivia as we scroll
+              if (!isTweening) { // Don't interfere if user is manually rotating to a location
+                // Bolivia longitude: -63.5887° W
+                // Get the target rotation for Bolivia
+                const boliviaLongitude = -63.5887;
+                const textureOffset = Math.PI * 1.5;
+                const targetRot = -THREE.MathUtils.degToRad(boliviaLongitude) + textureOffset;
+                
+                // Start from current rotation and interpolate toward Bolivia
+                // as scroll progresses, but only if we're more than 10% into the scroll
+                if (self.progress > 0.1) {
+                  const interpolationFactor = (self.progress - 0.1) / 0.9; // Normalize to 0-1 range
+                  // Interpolate rotation
+                  const startRotation = rotationY;
+                  const endRotation = targetRot;
+                  
+                  // Handle potential rotation wrapping (if difference > PI)
+                  let rotDiff = endRotation - startRotation;
+                  if (Math.abs(rotDiff) > Math.PI) {
+                    if (rotDiff > 0) {
+                      rotDiff = rotDiff - Math.PI * 2;
+                    } else {
+                      rotDiff = rotDiff + Math.PI * 2;
+                    }
+                  }
+                  
+                  // Set rotation directly (not using tweening)
+                  rotationY = startRotation + rotDiff * interpolationFactor * interpolationFactor; // Eased interpolation
+                }
+              }
+            }
+          },
+          onLeaveBack: () => {
+            // Resume auto rotation when scrolling back up
+            autoRotate.value = true;
+            // Reset the globe scale when scrolling back up
+            if (globe) {
+              globe.scale.set(0.8, 0.8, 0.8);
+              // Reset any active tweening
+              isTweening = false;
+            }
+          }
         }
-      })
+      });
 
-      // Animate the globe to move to the right
+      // Single, smooth animation using right property
       scrollAnimation.to(container.value, {
-        right: "20%", 
-        ease: 'none', // Linear animation to follow scroll exactly
-        duration: 1
-      })
+        right: "20%", // Move to 20% from the right edge
+        rotate: -5, // Slight rotation
+        ease: "power1.inOut",
+        duration: 1,
+        onComplete: () => {
+          // Ensure we're centered on Bolivia when scroll animation completes
+          centerOnBolivia();
+        }
+      });
     }
 
     function onWindowResize() {
@@ -163,6 +222,10 @@ export default {
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height)
+      
+      // Simply refresh ScrollTrigger on window resize
+      // The onUpdate callback will handle scaling appropriately
+      ScrollTrigger.refresh();
     }
 
     onBeforeUnmount(() => {
@@ -212,10 +275,11 @@ export default {
   position: fixed;
   top: 50%;
   right: 50%;
-  transform: translate(50%, -50%);
+  transform: translate(50%, -50%); /* Removed scale(1) to let GSAP handle it */
+  transform-origin: center center;
   z-index: 10;
-  will-change: transform;
-  pointer-events: none;
+  will-change: transform, right; /* Added right for smoother animation */
+  // pointer-events: none;
   /* Allow scrolling through the globe */
 }
 
