@@ -7,7 +7,7 @@ import vitePluginString from 'vite-plugin-string'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: 'globe-vue',
+  base: '/globe-vue',
   plugins: [vue(), vueDevTools(), vitePluginString()],
   resolve: {
     alias: {
